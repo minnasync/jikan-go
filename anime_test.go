@@ -8,7 +8,7 @@ import (
 func TestGetAnimeFullById(t *testing.T) {
 	client := NewJikanClient()
 
-	_, resp, err := client.Anime.GetAnimeFullById(t.Context(), "1")
+	_, resp, err := client.Anime.GetFullById(t.Context(), "1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,7 +21,7 @@ func TestGetAnimeFullById(t *testing.T) {
 func TestGetAnimeById(t *testing.T) {
 	client := NewJikanClient()
 
-	_, resp, err := client.Anime.GetAnimeById(t.Context(), "1")
+	_, resp, err := client.Anime.GetById(t.Context(), "1")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -54,17 +54,17 @@ type AnimeFull struct {
 	Streaming []Link     `json:"streaming"`
 }
 
-// GetAnimeFullById returns a complete anime resource.
+// GetFullById returns a complete anime resource.
 //
 // https://docs.api.jikan.moe/#/anime/getanimefullbyid
-func (s *AnimeEndpoints) GetAnimeFullById(ctx context.Context, id string) (*AnimeFull, *http.Response, error) {
+func (s *AnimeEndpoints) GetFullById(ctx context.Context, id string) (*AnimeFull, *http.Response, error) {
 	return nil, nil, nil
 }
 
-// GetAnimeById returns an anime resource.
+// GetById returns an anime resource.
 //
 // https://docs.api.jikan.moe/#/anime/getanimebyid
-func (s *AnimeEndpoints) GetAnimeById(ctx context.Context, id string) (*Anime, *http.Response, error) {
+func (s *AnimeEndpoints) GetById(ctx context.Context, id string) (*Anime, *http.Response, error) {
 	path := "/v4/anime/" + id
 	req, err := s.client.NewGETRequest(path)
 	if err != nil {
