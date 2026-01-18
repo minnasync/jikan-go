@@ -31,6 +31,7 @@ type Anime struct {
 	Popularity      int              `json:"popularity"`
 	Members         int              `json:"members"`
 	Favorites       int              `json:"favorites"`
+	Episodes        int              `json:"episodes"`
 	Synopsis        string           `json:"synopsis"`
 	Background      string           `json:"background"`
 	Season          string           `json:"season"`
@@ -58,7 +59,19 @@ type AnimeFull struct {
 //
 // https://docs.api.jikan.moe/#/anime/getanimefullbyid
 func (s *AnimeEndpoints) GetFullById(ctx context.Context, id string) (*AnimeFull, *http.Response, error) {
-	return nil, nil, nil
+	path := "/v4/anime/" + id + "/full"
+	req, err := s.client.NewGETRequest(path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	info := new(ResponseBody[AnimeFull])
+	resp, err := s.client.Do(ctx, req, info)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return &info.Data, resp, nil
 }
 
 // GetById returns an anime resource.
