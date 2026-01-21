@@ -3,6 +3,7 @@ package jikan
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -103,4 +104,30 @@ func (s *AnimeEndpoints) GetById(ctx context.Context, id string) (*Anime, *http.
 	}
 
 	return &info.Data, resp, nil
+}
+
+// GetSearch will search for an anime based on a query.
+//
+// https://docs.api.jikan.moe/#/anime/getanimesearch
+func (s *AnimeEndpoints) GetSearch(ctx context.Context, query string, values *url.Values) (*PaginatedResponseBody[Anime], *http.Response, error) {
+	path := "/v4/anime"
+	if values == nil {
+		values = &url.Values{}
+	}
+
+	values.Set("q", query)
+	path += "?" + values.Encode()
+
+	req, err := s.client.NewGETRequest(path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	info := new(PaginatedResponseBody[Anime])
+	resp, err := s.client.Do(ctx, req, info)
+	if err != nil {
+		return nil, resp, err
+	}
+
+	return info, resp, nil
 }
