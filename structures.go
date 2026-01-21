@@ -4,6 +4,23 @@ type ResponseBody[T any] struct {
 	Data T `json:"data"`
 }
 
+type PaginationItems struct {
+	Count   int `json:"count"`
+	Total   int `json:"total"`
+	PerPage int `json:"per_page"`
+}
+
+type Pagination struct {
+	LastVisiblePage int             `json:"last_visible_page"`
+	HasNextPage     bool            `json:"has_next_page"`
+	CurrentPage     int             `json:"current_page"`
+	Items           PaginationItems `json:"items"`
+}
+
+type PaginatedResponseBody[T any] struct {
+	Data []T `json:"data"`
+}
+
 type Image struct {
 	ImageURL string `json:"image_url"`
 	SmallURL string `json:"small_image_url"`

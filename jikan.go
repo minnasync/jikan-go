@@ -15,6 +15,7 @@ type Client struct {
 
 	common service
 	Anime  *AnimeEndpoints
+	Top    *TopEndpoints
 }
 
 type service struct {
@@ -25,6 +26,7 @@ func (c *Client) newClient() *Client {
 	c.common.client = c
 
 	c.Anime = (*AnimeEndpoints)(&c.common)
+	c.Top = (*TopEndpoints)(&c.common)
 
 	return c
 }
