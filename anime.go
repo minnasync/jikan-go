@@ -20,24 +20,24 @@ type Anime struct {
 	TitleEN         string           `json:"title_english"`
 	TitleJP         string           `json:"title_japanese"`
 	TitleSynonyms   []string         `json:"title_synonyms"`
-	Type            string           `json:"type"`
-	Source          string           `json:"source"`
-	Status          string           `json:"status"`
+	Type            *string          `json:"type"`
+	Source          *string          `json:"source"`
+	Episodes        *int             `json:"episodes"`
+	Status          *string          `json:"status"`
 	Airing          bool             `json:"airing"`
 	Aired           AiredInfo        `json:"aired"`
-	Duration        string           `json:"duration"`
-	Rating          string           `json:"rating"`
-	Score           float64          `json:"score"`
-	ScoredBy        int              `json:"scored_by"`
-	Rank            int              `json:"rank"`
-	Popularity      int              `json:"popularity"`
-	Members         int              `json:"members"`
-	Favorites       int              `json:"favorites"`
-	Episodes        int              `json:"episodes"`
-	Synopsis        string           `json:"synopsis"`
-	Background      string           `json:"background"`
-	Season          string           `json:"season"`
-	Year            int              `json:"year"`
+	Duration        *string          `json:"duration"`
+	Rating          *string          `json:"rating"`
+	Score           *float64         `json:"score"`
+	ScoredBy        *int             `json:"scored_by"`
+	Rank            *int             `json:"rank"`
+	Popularity      *int             `json:"popularity"`
+	Members         *int             `json:"members"`
+	Favorites       *int             `json:"favorites"`
+	Synopsis        *string          `json:"synopsis"`
+	Background      *string          `json:"background"`
+	Season          *string          `json:"season"`
+	Year            *int             `json:"year"`
 	Broadcast       BroadcastInfo    `json:"broadcast"`
 	Producers       []Entity         `json:"producers"`
 	Licensors       []Entity         `json:"licensors"`
@@ -52,8 +52,10 @@ type Anime struct {
 func (a *Anime) IsExplicit() bool {
 	isExplicit := false
 
-	if strings.HasPrefix(a.Rating, "R") {
-		isExplicit = true
+	if a.Rating == nil {
+		if strings.HasPrefix(*a.Rating, "R") {
+			isExplicit = true
+		}
 	}
 
 	return isExplicit
