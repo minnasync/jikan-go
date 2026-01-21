@@ -3,6 +3,7 @@ package jikan
 import (
 	"context"
 	"net/http"
+	"strings"
 )
 
 type AnimeEndpoints service
@@ -44,6 +45,17 @@ type Anime struct {
 	ExplicityGenres []Entity         `json:"explicit_genres"`
 	Themes          []Entity         `json:"themes"`
 	Demographics    []Entity         `json:"demographics"`
+}
+
+// IsExplicit will check the rating to determine if the anime is considered explicit.
+func (a *Anime) IsExplicit() bool {
+	isExplicit := false
+
+	if strings.HasPrefix(a.Rating, "R") {
+		isExplicit = true
+	}
+
+	return isExplicit
 }
 
 type AnimeFull struct {
