@@ -9,43 +9,71 @@ import (
 
 type AnimeEndpoints service
 
+type Images map[string]Image
+
+// GetPoster will get the highest resolution poster image.
+func (i Images) GetPoster() *string {
+	formats := []string{"webp", "jpg"}
+
+	for _, format := range formats {
+		images, ok := i[format]
+		if !ok {
+			continue
+		}
+
+		if images.LargeURL != "" {
+			return &images.LargeURL
+		}
+
+		if images.ImageURL != "" {
+			return &images.ImageURL
+		}
+
+		if images.SmallURL != "" {
+			return &images.SmallURL
+		}
+	}
+
+	return nil
+}
+
 type Anime struct {
-	MalID           int              `json:"mal_id"`
-	URL             string           `json:"url"`
-	Images          map[string]Image `json:"images"`
-	Trailer         Trailer          `json:"trailer"`
-	Approved        bool             `json:"approved"`
-	Titles          []Title          `json:"titles"`
-	Title           string           `json:"title"`
-	TitleEN         string           `json:"title_english"`
-	TitleJP         string           `json:"title_japanese"`
-	TitleSynonyms   []string         `json:"title_synonyms"`
-	Type            *string          `json:"type"`
-	Source          *string          `json:"source"`
-	Episodes        *int             `json:"episodes"`
-	Status          *string          `json:"status"`
-	Airing          bool             `json:"airing"`
-	Aired           AiredInfo        `json:"aired"`
-	Duration        *string          `json:"duration"`
-	Rating          *string          `json:"rating"`
-	Score           *float64         `json:"score"`
-	ScoredBy        *int             `json:"scored_by"`
-	Rank            *int             `json:"rank"`
-	Popularity      *int             `json:"popularity"`
-	Members         *int             `json:"members"`
-	Favorites       *int             `json:"favorites"`
-	Synopsis        *string          `json:"synopsis"`
-	Background      *string          `json:"background"`
-	Season          *string          `json:"season"`
-	Year            *int             `json:"year"`
-	Broadcast       BroadcastInfo    `json:"broadcast"`
-	Producers       []Entity         `json:"producers"`
-	Licensors       []Entity         `json:"licensors"`
-	Studios         []Entity         `json:"studios"`
-	Genres          []Entity         `json:"genres"`
-	ExplicityGenres []Entity         `json:"explicit_genres"`
-	Themes          []Entity         `json:"themes"`
-	Demographics    []Entity         `json:"demographics"`
+	MalID           int           `json:"mal_id"`
+	URL             string        `json:"url"`
+	Images          Images        `json:"images"`
+	Trailer         Trailer       `json:"trailer"`
+	Approved        bool          `json:"approved"`
+	Titles          []Title       `json:"titles"`
+	Title           string        `json:"title"`
+	TitleEN         string        `json:"title_english"`
+	TitleJP         string        `json:"title_japanese"`
+	TitleSynonyms   []string      `json:"title_synonyms"`
+	Type            *string       `json:"type"`
+	Source          *string       `json:"source"`
+	Episodes        *int          `json:"episodes"`
+	Status          *string       `json:"status"`
+	Airing          bool          `json:"airing"`
+	Aired           AiredInfo     `json:"aired"`
+	Duration        *string       `json:"duration"`
+	Rating          *string       `json:"rating"`
+	Score           *float64      `json:"score"`
+	ScoredBy        *int          `json:"scored_by"`
+	Rank            *int          `json:"rank"`
+	Popularity      *int          `json:"popularity"`
+	Members         *int          `json:"members"`
+	Favorites       *int          `json:"favorites"`
+	Synopsis        *string       `json:"synopsis"`
+	Background      *string       `json:"background"`
+	Season          *string       `json:"season"`
+	Year            *int          `json:"year"`
+	Broadcast       BroadcastInfo `json:"broadcast"`
+	Producers       []Entity      `json:"producers"`
+	Licensors       []Entity      `json:"licensors"`
+	Studios         []Entity      `json:"studios"`
+	Genres          []Entity      `json:"genres"`
+	ExplicityGenres []Entity      `json:"explicit_genres"`
+	Themes          []Entity      `json:"themes"`
+	Demographics    []Entity      `json:"demographics"`
 }
 
 // IsExplicit will check the rating to determine if the anime is considered explicit.
