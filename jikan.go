@@ -13,9 +13,10 @@ type Client struct {
 	client  *http.Client
 	baseUrl *url.URL
 
-	common service
-	Anime  *AnimeEndpoints
-	Top    *TopEndpoints
+	common  service
+	Anime   *AnimeEndpoints
+	Seasons *SeasonsEndpoints
+	Top     *TopEndpoints
 }
 
 type service struct {
@@ -26,6 +27,7 @@ func (c *Client) newClient() *Client {
 	c.common.client = c
 
 	c.Anime = (*AnimeEndpoints)(&c.common)
+	c.Seasons = (*SeasonsEndpoints)(&c.common)
 	c.Top = (*TopEndpoints)(&c.common)
 
 	return c
