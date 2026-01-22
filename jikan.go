@@ -7,11 +7,14 @@ import (
 	"net/url"
 
 	"github.com/minnasync/jikan-go/internal/httpx"
+	"github.com/redis/go-redis/v9"
 )
 
 type Client struct {
 	client  *http.Client
 	baseUrl *url.URL
+
+	cache Cache
 
 	common  service
 	Anime   *AnimeEndpoints
@@ -21,6 +24,15 @@ type Client struct {
 
 type service struct {
 	client *Client
+}
+
+type ClientOption func(*Client)
+
+// WithRedisCache will enable redis caching.
+func WithRedisCache(client *redis.Client) ClientOption {
+	return func(c *Client) {
+		c.cache = NewRedisCache(client)
+	}
 }
 
 func (c *Client) newClient() *Client {
@@ -34,7 +46,7 @@ func (c *Client) newClient() *Client {
 }
 
 // NewJikanClient will create a new, default client.
-func NewJikanClient() *Client {
+func NewJikanClient(options ...ClientOption) *Client {
 	ratelimit := &httpx.RequestLimitRoundTripper{
 		RoundTripper: http.DefaultTransport,
 	}
@@ -47,6 +59,10 @@ func NewJikanClient() *Client {
 			Scheme: "https",
 			Host:   "api.jikan.moe",
 		},
+	}
+
+	for _, option := range options {
+		option(c)
 	}
 
 	return c.newClient()
