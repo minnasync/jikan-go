@@ -11,7 +11,7 @@ The library itself supports basic caching methods. At the moment, only Redis is 
 package main
 
 import (
-    "github.com/MinnDevelopment/jikan-go"
+    "github.com/minnasync/jikan-go"
 )
 
 func initRedis() *redis.Client {
@@ -35,7 +35,7 @@ If you have an advanced usecase and do not like how the caching works, you can i
 package main
 
 import (
-    "github.com/MinnDevelopment/jikan-go"
+    "github.com/minnasync/jikan-go"
 )
 
 type CustomCache struct {}
