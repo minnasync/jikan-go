@@ -102,11 +102,11 @@ type AnimeFull struct {
 // GetFullById returns a complete anime resource.
 //
 // https://docs.api.jikan.moe/#/anime/getanimefullbyid
-func (s *AnimeEndpoints) GetFullById(ctx context.Context, id string) (*ResponseBody[AnimeFull], *Response, error) {
-	info := new(ResponseBody[AnimeFull])
+func (s *AnimeEndpoints) GetFullById(ctx context.Context, id string) (*AnimeFull, *Response, error) {
 	path := "/v4/anime/" + id + "/full"
 
 	if s.client.cache != nil {
+		info := new(AnimeFull)
 		err := s.client.cache.Get(ctx, "jikan:anime-full:"+id, info)
 		if err == nil {
 			return info, &Response{
@@ -121,6 +121,7 @@ func (s *AnimeEndpoints) GetFullById(ctx context.Context, id string) (*ResponseB
 		return nil, nil, err
 	}
 
+	info := new(ResponseBody[AnimeFull])
 	resp, err := s.client.Do(ctx, req, info)
 	if err != nil {
 		return nil, &Response{
@@ -133,7 +134,7 @@ func (s *AnimeEndpoints) GetFullById(ctx context.Context, id string) (*ResponseB
 		s.client.cache.DeferSet(ctx, "jikan:anime-full:"+id, info, time.Hour*24)
 	}
 
-	return info, &Response{
+	return &info.Data, &Response{
 		IsCached: false,
 		Response: resp,
 	}, nil
@@ -142,11 +143,11 @@ func (s *AnimeEndpoints) GetFullById(ctx context.Context, id string) (*ResponseB
 // GetById returns an anime resource.
 //
 // https://docs.api.jikan.moe/#/anime/getanimebyid
-func (s *AnimeEndpoints) GetById(ctx context.Context, id string) (*ResponseBody[Anime], *Response, error) {
-	info := new(ResponseBody[Anime])
+func (s *AnimeEndpoints) GetById(ctx context.Context, id string) (*Anime, *Response, error) {
 	path := "/v4/anime/" + id
 
 	if s.client.cache != nil {
+		info := new(Anime)
 		err := s.client.cache.Get(ctx, "jikan:anime:"+id, info)
 		if err == nil {
 			return info, &Response{
@@ -161,6 +162,7 @@ func (s *AnimeEndpoints) GetById(ctx context.Context, id string) (*ResponseBody[
 		return nil, nil, err
 	}
 
+	info := new(ResponseBody[Anime])
 	resp, err := s.client.Do(ctx, req, info)
 	if err != nil {
 		return nil, &Response{
@@ -173,7 +175,7 @@ func (s *AnimeEndpoints) GetById(ctx context.Context, id string) (*ResponseBody[
 		s.client.cache.DeferSet(ctx, "jikan:anime:"+id, info, time.Hour*24)
 	}
 
-	return info, &Response{
+	return &info.Data, &Response{
 		IsCached: false,
 		Response: resp,
 	}, nil
