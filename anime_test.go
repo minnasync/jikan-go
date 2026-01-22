@@ -13,8 +13,8 @@ func TestGetAnimeFullById(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		t.Fatal(resp.Status)
+	if resp.Response != nil && resp.Response.StatusCode != http.StatusOK {
+		t.Fatal(resp.Response.Status)
 	}
 }
 
@@ -26,7 +26,7 @@ func TestGetAnimeById(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		t.Fatal(resp.Status)
+	if resp.Response != nil && resp.Response.StatusCode != http.StatusOK {
+		t.Fatal(resp.Response.Status)
 	}
 }

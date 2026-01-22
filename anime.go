@@ -2,9 +2,10 @@ package jikan
 
 import (
 	"context"
-	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type AnimeEndpoints service
@@ -101,45 +102,88 @@ type AnimeFull struct {
 // GetFullById returns a complete anime resource.
 //
 // https://docs.api.jikan.moe/#/anime/getanimefullbyid
-func (s *AnimeEndpoints) GetFullById(ctx context.Context, id string) (*AnimeFull, *http.Response, error) {
+func (s *AnimeEndpoints) GetFullById(ctx context.Context, id string) (*ResponseBody[AnimeFull], *Response, error) {
+	info := new(ResponseBody[AnimeFull])
 	path := "/v4/anime/" + id + "/full"
+
+	if s.client.cache != nil {
+		err := s.client.cache.Get(ctx, "jikan:anime-full:"+id, info)
+		if err == nil {
+			return info, &Response{
+				IsCached: true,
+				Response: nil,
+			}, nil
+		}
+	}
+
 	req, err := s.client.NewGETRequest(path)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	info := new(ResponseBody[AnimeFull])
 	resp, err := s.client.Do(ctx, req, info)
 	if err != nil {
-		return nil, resp, err
+		return nil, &Response{
+			IsCached: false,
+			Response: resp,
+		}, err
 	}
 
-	return &info.Data, resp, nil
+	if s.client.cache != nil {
+		s.client.cache.DeferSet(ctx, "jikan:anime-full:"+id, info, time.Hour*24)
+	}
+
+	return info, &Response{
+		IsCached: false,
+		Response: resp,
+	}, nil
 }
 
 // GetById returns an anime resource.
 //
 // https://docs.api.jikan.moe/#/anime/getanimebyid
-func (s *AnimeEndpoints) GetById(ctx context.Context, id string) (*Anime, *http.Response, error) {
+func (s *AnimeEndpoints) GetById(ctx context.Context, id string) (*ResponseBody[Anime], *Response, error) {
+	info := new(ResponseBody[Anime])
 	path := "/v4/anime/" + id
+
+	if s.client.cache != nil {
+		err := s.client.cache.Get(ctx, "jikan:anime:"+id, info)
+		if err == nil {
+			return info, &Response{
+				IsCached: true,
+				Response: nil,
+			}, nil
+		}
+	}
+
 	req, err := s.client.NewGETRequest(path)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	info := new(ResponseBody[Anime])
 	resp, err := s.client.Do(ctx, req, info)
 	if err != nil {
-		return nil, resp, err
+		return nil, &Response{
+			IsCached: false,
+			Response: resp,
+		}, err
 	}
 
-	return &info.Data, resp, nil
+	if s.client.cache != nil {
+		s.client.cache.DeferSet(ctx, "jikan:anime:"+id, info, time.Hour*24)
+	}
+
+	return info, &Response{
+		IsCached: false,
+		Response: resp,
+	}, nil
 }
 
 // GetSearch will search for an anime based on a query.
 //
 // https://docs.api.jikan.moe/#/anime/getanimesearch
-func (s *AnimeEndpoints) GetSearch(ctx context.Context, query string, values *url.Values) (*PaginatedResponseBody[Anime], *http.Response, error) {
+func (s *AnimeEndpoints) GetSearch(ctx context.Context, query string, values *url.Values) (*PaginatedResponseBody[Anime], *Response, error) {
+	info := new(PaginatedResponseBody[Anime])
 	path := "/v4/anime"
 	if values == nil {
 		values = &url.Values{}
@@ -148,16 +192,41 @@ func (s *AnimeEndpoints) GetSearch(ctx context.Context, query string, values *ur
 	values.Set("q", query)
 	path += "?" + values.Encode()
 
+	if s.client.cache != nil {
+		err := s.client.cache.Get(ctx, "jikan:anime-search"+values.Encode(), info)
+		if err == nil {
+			return info, &Response{
+				IsCached: true,
+				Response: nil,
+			}, nil
+		}
+	}
+
 	req, err := s.client.NewGETRequest(path)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	info := new(PaginatedResponseBody[Anime])
 	resp, err := s.client.Do(ctx, req, info)
 	if err != nil {
-		return nil, resp, err
+		return nil, &Response{
+			IsCached: false,
+			Response: resp,
+		}, err
 	}
 
-	return info, resp, nil
+	if s.client.cache != nil {
+		s.client.cache.DeferSet(ctx, "jikan:anime-search"+values.Encode(), info, time.Hour*24)
+
+		animeMap := make(map[string]any, len(info.Data))
+		for _, anime := range info.Data {
+			animeMap["jikan:anime:"+strconv.Itoa(anime.MalID)] = anime
+		}
+		s.client.cache.DeferBulkSet(ctx, animeMap, time.Hour*24)
+	}
+
+	return info, &Response{
+		IsCached: false,
+		Response: resp,
+	}, nil
 }

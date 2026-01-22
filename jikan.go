@@ -10,6 +10,11 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+type Response struct {
+	IsCached bool
+	Response *http.Response
+}
+
 type Client struct {
 	client  *http.Client
 	baseUrl *url.URL
