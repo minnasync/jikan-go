@@ -131,7 +131,7 @@ func (s *AnimeEndpoints) GetFullById(ctx context.Context, id string) (*AnimeFull
 	}
 
 	if s.client.cache != nil {
-		s.client.cache.DeferSet(ctx, "jikan:anime-full:"+id, info, time.Hour*24)
+		s.client.cache.DeferSet(ctx, "jikan:anime-full:"+id, info.Data, time.Hour*24)
 	}
 
 	return &info.Data, &Response{
@@ -172,7 +172,7 @@ func (s *AnimeEndpoints) GetById(ctx context.Context, id string) (*Anime, *Respo
 	}
 
 	if s.client.cache != nil {
-		s.client.cache.DeferSet(ctx, "jikan:anime:"+id, info, time.Hour*24)
+		s.client.cache.DeferSet(ctx, "jikan:anime:"+id, info.Data, time.Hour*24)
 	}
 
 	return &info.Data, &Response{
