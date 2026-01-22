@@ -80,7 +80,7 @@ type Anime struct {
 func (a *Anime) IsExplicit() bool {
 	isExplicit := false
 
-	if a.Rating == nil {
+	if a.Rating != nil {
 		if strings.HasPrefix(*a.Rating, "R") {
 			isExplicit = true
 		}
