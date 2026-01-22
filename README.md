@@ -12,6 +12,7 @@ package main
 
 import (
     "github.com/minnasync/jikan-go"
+    "github.com/go-redis/redis/v9"
 )
 
 func initRedis() *redis.Client {
