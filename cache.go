@@ -14,6 +14,12 @@ type Cache interface {
 	Get(ctx context.Context, key string, value any) error
 	// Set will set a value in the cache.
 	Set(ctx context.Context, key string, value any, ttl time.Duration) error
+	// DeferSet will set a value in the cache, but will not wait for the operation to complete.
+	DeferSet(ctx context.Context, key string, value any, ttl time.Duration)
+	// BulkSet will set multiple values in the cache.
+	BulkSet(ctx context.Context, keyValues map[string]any, ttl time.Duration) error
+	// DeferBulkSet will set multiple values in the cache, but will not wait for the operation to complete.
+	DeferBulkSet(ctx context.Context, keyValues map[string]any, ttl time.Duration)
 	// Delete will delete a value from the cache.
 	Delete(ctx context.Context, key string) error
 }
@@ -34,17 +40,11 @@ func NewRedisCache(client *redis.Client) Cache {
 
 func (c *RedisCache) Get(ctx context.Context, key string, v any) error {
 	_, err, _ := c.sf.Do(key, func() (any, error) {
-		data := new(any)
-
-		if err := redisx.JSONUnwrap(ctx, c.client, key, "$", &data); err != nil {
-			if err == redis.Nil {
-				return nil, nil
-			}
-
+		if err := redisx.JSONUnwrap(ctx, c.client, key, "$", &v); err != nil {
 			return nil, err
 		}
 
-		return data, nil
+		return nil, nil
 	})
 
 	return err
@@ -60,15 +60,35 @@ func (c *RedisCache) Set(ctx context.Context, key string, v any, ttl time.Durati
 	return err
 }
 
+func (c *RedisCache) DeferSet(ctx context.Context, key string, v any, ttl time.Duration) {
+	defer func() {
+		_ = c.Set(ctx, key, v, ttl)
+	}()
+}
+
+func (c *RedisCache) BulkSet(ctx context.Context, keyValues map[string]any, ttl time.Duration) error {
+	pipeline := c.client.Pipeline()
+
+	for key, value := range keyValues {
+		pipeline.JSONSet(ctx, key, "$", value)
+		pipeline.Expire(ctx, key, ttl)
+	}
+
+	_, err := pipeline.Exec(ctx)
+	return err
+}
+
+func (c *RedisCache) DeferBulkSet(ctx context.Context, keyValues map[string]any, ttl time.Duration) {
+	defer func() {
+		_ = c.BulkSet(ctx, keyValues, ttl)
+	}()
+}
+
 func (c *RedisCache) Delete(ctx context.Context, key string) error {
 	_, err, _ := c.sf.Do(key, func() (any, error) {
 		cmd := c.client.JSONDel(ctx, key, "$")
 
 		if err := cmd.Err(); err != nil {
-			if err == redis.Nil {
-				return nil, nil
-			}
-
 			return nil, err
 		}
 
