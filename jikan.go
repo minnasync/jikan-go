@@ -40,6 +40,13 @@ func WithRedisCache(client *redis.Client) ClientOption {
 	}
 }
 
+// WithCache will enable caching with a custom cache manager.
+func WithCache(cache Cache) ClientOption {
+	return func(c *Client) {
+		c.cache = cache
+	}
+}
+
 func (c *Client) newClient() *Client {
 	c.common.client = c
 
