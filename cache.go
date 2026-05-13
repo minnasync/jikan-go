@@ -3,6 +3,7 @@ package jikan
 import (
 	"context"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/minnasync/jikan-go/internal/redisx"
@@ -24,6 +25,162 @@ type baseCache[T any] interface {
 	BulkSet(ctx context.Context, keyValues map[string]T, opts *CacheOpts) error
 	// Delete will delete a value from the cache.
 	Delete(ctx context.Context, key string) error
+}
+
+type AnimeCache interface {
+	AnimeCache() baseCache[Anime]
+	AnimeFullCache() baseCache[AnimeFull]
+
+	GetAnime(ctx context.Context, id string) (*Anime, error)
+	GetAnimeFull(ctx context.Context, id string) (*AnimeFull, error)
+	SetAnime(ctx context.Context, data Anime) error
+	SetAnimeFull(ctx context.Context, data AnimeFull) error
+	BulkSetAnime(ctx context.Context, data []Anime) error
+}
+
+type animeCacheImpl struct {
+	anime     baseCache[Anime]
+	animeFull baseCache[AnimeFull]
+}
+
+func newAnimeCache(anime baseCache[Anime], animeFull baseCache[AnimeFull]) AnimeCache {
+	return &animeCacheImpl{anime: anime, animeFull: animeFull}
+}
+
+func (c animeCacheImpl) AnimeCache() baseCache[Anime] {
+	return c.anime
+}
+
+func (c animeCacheImpl) AnimeFullCache() baseCache[AnimeFull] {
+	return c.animeFull
+}
+
+func (c animeCacheImpl) GetAnime(ctx context.Context, id string) (*Anime, error) {
+	return c.anime.Get(ctx, "jikan:anime_"+id)
+}
+
+func (c animeCacheImpl) GetAnimeFull(ctx context.Context, id string) (*AnimeFull, error) {
+	return c.animeFull.Get(ctx, "jikan:anime-full_"+id)
+}
+
+func (c animeCacheImpl) SetAnime(ctx context.Context, data Anime) error {
+	return c.anime.Set(ctx, "jikan:anime_"+strconv.Itoa(data.MalID), data, nil)
+}
+
+func (c animeCacheImpl) SetAnimeFull(ctx context.Context, data AnimeFull) error {
+	// If the full value is fetched, we can set the base as well.
+	// Makes sense to do since it's the same info.
+	if err := c.SetAnime(ctx, data.Anime); err != nil {
+		return err
+	}
+
+	return c.animeFull.Set(ctx, "jikan:anime-full_"+strconv.Itoa(data.MalID), data, nil)
+}
+
+func (c animeCacheImpl) BulkSetAnime(ctx context.Context, data []Anime) error {
+	entries := make(map[string]Anime, len(data))
+	for _, entry := range data {
+		entries["jikan:anime_"+strconv.Itoa(entry.MalID)] = entry
+	}
+
+	return c.anime.BulkSet(ctx, entries, nil)
+}
+
+type inMemoryCacheEntry[T any] struct {
+	value   T
+	expires time.Time
+}
+
+type inMemoryCacheImpl[T any] struct {
+	mu      sync.RWMutex
+	entries map[string]inMemoryCacheEntry[T]
+}
+
+func newInMemoryCache[T any]() baseCache[T] {
+	return &inMemoryCacheImpl[T]{
+		entries: make(map[string]inMemoryCacheEntry[T]),
+	}
+}
+
+func (c *inMemoryCacheImpl[T]) Get(ctx context.Context, key string) (*T, error) {
+	c.mu.RLock()
+	entry, ok := c.entries[key]
+	c.mu.RUnlock()
+
+	if !entry.expires.IsZero() && time.Now().After(entry.expires) {
+		_ = c.Delete(ctx, key)
+		return nil, nil
+	}
+
+	if !ok {
+		return nil, nil
+	}
+
+	return &entry.value, nil
+}
+
+func (c *inMemoryCacheImpl[T]) Set(ctx context.Context, key string, value T, opts *CacheOpts) error {
+	entry := inMemoryCacheEntry[T]{
+		value: value,
+	}
+
+	if opts != nil && opts.TTL != nil {
+		entry.expires = time.Now().Add(*opts.TTL)
+	}
+
+	c.mu.Lock()
+	c.entries[key] = entry
+	c.mu.Unlock()
+
+	return nil
+}
+
+func (c *inMemoryCacheImpl[T]) BulkSet(ctx context.Context, keyValues map[string]T, opts *CacheOpts) error {
+	var expiresAt time.Time
+	if opts != nil && opts.TTL != nil {
+		expiresAt = time.Now().Add(*opts.TTL)
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	for k, v := range keyValues {
+		entry := inMemoryCacheEntry[T]{
+			value:   v,
+			expires: expiresAt,
+		}
+
+		c.entries[k] = entry
+	}
+
+	return nil
+}
+
+func (c *inMemoryCacheImpl[T]) Delete(ctx context.Context, key string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	delete(c.entries, key)
+
+	return nil
+}
+
+type DefaultCache struct {
+	anime AnimeCache
+}
+
+// DefaultCache is a cache manager for an in-memory cache.
+func NewCache() Caches {
+	return &DefaultCache{
+		anime: newAnimeCache(
+			newInMemoryCache[Anime](),
+			newInMemoryCache[AnimeFull](),
+		),
+	}
+}
+
+func (c *DefaultCache) Anime() AnimeCache {
+	return c.anime
 }
 
 type redisJSONCacheImpl[T any] struct {
@@ -88,65 +245,6 @@ func (c *redisJSONCacheImpl[T]) BulkSet(ctx context.Context, keyValues map[strin
 
 func (c *redisJSONCacheImpl[T]) Delete(ctx context.Context, key string) error {
 	return c.client.JSONDel(ctx, key, "$").Err()
-}
-
-type AnimeCache interface {
-	AnimeCache() baseCache[Anime]
-	AnimeFullCache() baseCache[AnimeFull]
-
-	GetAnime(ctx context.Context, id string) (*Anime, error)
-	GetAnimeFull(ctx context.Context, id string) (*AnimeFull, error)
-	SetAnime(ctx context.Context, data Anime) error
-	SetAnimeFull(ctx context.Context, data AnimeFull) error
-	BulkSetAnime(ctx context.Context, data []Anime) error
-}
-
-type animeCacheImpl struct {
-	anime     baseCache[Anime]
-	animeFull baseCache[AnimeFull]
-}
-
-func newAnimeCache(anime baseCache[Anime], animeFull baseCache[AnimeFull]) AnimeCache {
-	return &animeCacheImpl{anime: anime, animeFull: animeFull}
-}
-
-func (c animeCacheImpl) AnimeCache() baseCache[Anime] {
-	return c.anime
-}
-
-func (c animeCacheImpl) AnimeFullCache() baseCache[AnimeFull] {
-	return c.animeFull
-}
-
-func (c animeCacheImpl) GetAnime(ctx context.Context, id string) (*Anime, error) {
-	return c.anime.Get(ctx, "jikan:anime_"+id)
-}
-
-func (c animeCacheImpl) GetAnimeFull(ctx context.Context, id string) (*AnimeFull, error) {
-	return c.animeFull.Get(ctx, "jikan:anime-full_"+id)
-}
-
-func (c animeCacheImpl) SetAnime(ctx context.Context, data Anime) error {
-	return c.anime.Set(ctx, "jikan:anime_"+strconv.Itoa(data.MalID), data, nil)
-}
-
-func (c animeCacheImpl) SetAnimeFull(ctx context.Context, data AnimeFull) error {
-	// If the full value is fetched, we can set the base as well.
-	// Makes sense to do since it's the same info.
-	if err := c.SetAnime(ctx, data.Anime); err != nil {
-		return err
-	}
-
-	return c.animeFull.Set(ctx, "jikan:anime-full_"+strconv.Itoa(data.MalID), data, nil)
-}
-
-func (c animeCacheImpl) BulkSetAnime(ctx context.Context, data []Anime) error {
-	entries := make(map[string]Anime, len(data))
-	for _, entry := range data {
-		entries["jikan:anime_"+strconv.Itoa(entry.MalID)] = entry
-	}
-
-	return c.anime.BulkSet(ctx, entries, nil)
 }
 
 type Caches interface {
