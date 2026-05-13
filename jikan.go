@@ -40,13 +40,6 @@ func WithRedisCache(client *redis.Client) ClientOption {
 	}
 }
 
-// WithCache will enable caching with a custom cache manager.
-func WithCache(cache Caches) ClientOption {
-	return func(c *Client) {
-		c.cache = cache
-	}
-}
-
 func (c *Client) newClient() *Client {
 	c.common.client = c
 
@@ -71,6 +64,7 @@ func NewJikanClient(options ...ClientOption) *Client {
 			Scheme: "https",
 			Host:   "api.jikan.moe",
 		},
+		cache: NewCache(),
 	}
 
 	for _, option := range options {
