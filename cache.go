@@ -61,7 +61,7 @@ func (c *RedisCache) Set(ctx context.Context, key string, v any, ttl time.Durati
 }
 
 func (c *RedisCache) DeferSet(ctx context.Context, key string, v any, ttl time.Duration) {
-	defer func() {
+	go func() {
 		_ = c.Set(ctx, key, v, ttl)
 	}()
 }
@@ -79,7 +79,7 @@ func (c *RedisCache) BulkSet(ctx context.Context, keyValues map[string]any, ttl 
 }
 
 func (c *RedisCache) DeferBulkSet(ctx context.Context, keyValues map[string]any, ttl time.Duration) {
-	defer func() {
+	go func() {
 		_ = c.BulkSet(ctx, keyValues, ttl)
 	}()
 }
