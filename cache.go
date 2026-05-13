@@ -2,6 +2,7 @@ package jikan
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"sync"
 	"time"
@@ -9,6 +10,10 @@ import (
 	"github.com/minnasync/jikan-go/internal/redisx"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/sync/singleflight"
+)
+
+var (
+	ErrCacheMiss = errors.New("cache miss")
 )
 
 type CacheOpts struct {
@@ -107,13 +112,13 @@ func (c *inMemoryCacheImpl[T]) Get(ctx context.Context, key string) (*T, error) 
 	entry, ok := c.entries[key]
 	c.mu.RUnlock()
 
-	if !entry.expires.IsZero() && time.Now().After(entry.expires) {
-		_ = c.Delete(ctx, key)
-		return nil, nil
+	if !ok {
+		return nil, ErrCacheMiss
 	}
 
-	if !ok {
-		return nil, nil
+	if !entry.expires.IsZero() && time.Now().After(entry.expires) {
+		_ = c.Delete(ctx, key)
+		return nil, ErrCacheMiss
 	}
 
 	return &entry.value, nil
