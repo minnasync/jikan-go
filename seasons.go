@@ -3,8 +3,6 @@ package jikan
 import (
 	"context"
 	"net/url"
-	"strconv"
-	"time"
 )
 
 type SeasonsEndpoints service
@@ -18,16 +16,6 @@ func (s *SeasonsEndpoints) Now(ctx context.Context, query *url.Values) (*Paginat
 
 	path := "/v4/seasons/now"
 	path += "?" + query.Encode()
-
-	if s.client.cache != nil {
-		err := s.client.cache.Get(ctx, "jikan:seasons-now"+query.Encode(), info)
-		if err == nil {
-			return info, &Response{
-				IsCached: true,
-				Response: nil,
-			}, nil
-		}
-	}
 
 	req, err := s.client.NewGETRequest(path)
 	if err != nil {
@@ -43,12 +31,9 @@ func (s *SeasonsEndpoints) Now(ctx context.Context, query *url.Values) (*Paginat
 	}
 
 	if s.client.cache != nil {
-		s.client.cache.DeferSet(ctx, "jikan:seasons-now"+query.Encode(), info, time.Hour*24)
-		animeMap := make(map[string]any, len(info.Data))
-		for _, anime := range info.Data {
-			animeMap["jikan:anime:"+strconv.Itoa(anime.MalID)] = anime
-		}
-		s.client.cache.DeferBulkSet(ctx, animeMap, time.Hour*24)
+		go func() {
+			_ = s.client.cache.Anime().BulkSetAnime(ctx, info.Data)
+		}()
 	}
 
 	return info, &Response{
