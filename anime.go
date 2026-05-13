@@ -3,9 +3,7 @@ package jikan
 import (
 	"context"
 	"net/url"
-	"strconv"
 	"strings"
-	"time"
 )
 
 type AnimeEndpoints service
@@ -106,8 +104,7 @@ func (s *AnimeEndpoints) GetFullById(ctx context.Context, id string) (*AnimeFull
 	path := "/v4/anime/" + id + "/full"
 
 	if s.client.cache != nil {
-		info := new(AnimeFull)
-		err := s.client.cache.Get(ctx, "jikan:anime-full:"+id, info)
+		info, err := s.client.cache.Anime().GetAnimeFull(ctx, id)
 		if err == nil {
 			return info, &Response{
 				IsCached: true,
@@ -131,7 +128,9 @@ func (s *AnimeEndpoints) GetFullById(ctx context.Context, id string) (*AnimeFull
 	}
 
 	if s.client.cache != nil {
-		s.client.cache.DeferSet(ctx, "jikan:anime-full:"+id, info.Data, time.Hour*24)
+		go func() {
+			_ = s.client.cache.Anime().SetAnimeFull(ctx, info.Data)
+		}()
 	}
 
 	return &info.Data, &Response{
@@ -147,8 +146,7 @@ func (s *AnimeEndpoints) GetById(ctx context.Context, id string) (*Anime, *Respo
 	path := "/v4/anime/" + id
 
 	if s.client.cache != nil {
-		info := new(Anime)
-		err := s.client.cache.Get(ctx, "jikan:anime:"+id, info)
+		info, err := s.client.cache.Anime().GetAnime(ctx, id)
 		if err == nil {
 			return info, &Response{
 				IsCached: true,
@@ -172,7 +170,9 @@ func (s *AnimeEndpoints) GetById(ctx context.Context, id string) (*Anime, *Respo
 	}
 
 	if s.client.cache != nil {
-		s.client.cache.DeferSet(ctx, "jikan:anime:"+id, info.Data, time.Hour*24)
+		go func() {
+			_ = s.client.cache.Anime().SetAnime(ctx, info.Data)
+		}()
 	}
 
 	return &info.Data, &Response{
@@ -194,16 +194,6 @@ func (s *AnimeEndpoints) GetSearch(ctx context.Context, query string, values *ur
 	values.Set("q", query)
 	path += "?" + values.Encode()
 
-	if s.client.cache != nil {
-		err := s.client.cache.Get(ctx, "jikan:anime-search"+values.Encode(), info)
-		if err == nil {
-			return info, &Response{
-				IsCached: true,
-				Response: nil,
-			}, nil
-		}
-	}
-
 	req, err := s.client.NewGETRequest(path)
 	if err != nil {
 		return nil, nil, err
@@ -218,13 +208,9 @@ func (s *AnimeEndpoints) GetSearch(ctx context.Context, query string, values *ur
 	}
 
 	if s.client.cache != nil {
-		s.client.cache.DeferSet(ctx, "jikan:anime-search"+values.Encode(), info, time.Hour*24)
-
-		animeMap := make(map[string]any, len(info.Data))
-		for _, anime := range info.Data {
-			animeMap["jikan:anime:"+strconv.Itoa(anime.MalID)] = anime
-		}
-		s.client.cache.DeferBulkSet(ctx, animeMap, time.Hour*24)
+		go func() {
+			_ = s.client.cache.Anime().BulkSetAnime(ctx, info.Data)
+		}()
 	}
 
 	return info, &Response{

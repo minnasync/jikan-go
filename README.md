@@ -29,31 +29,3 @@ func main() {
     client = jikan.NewClient(jikan.WithRedisCache(redisClient))
 }
 ```
-
-### Advanced Caching
-If you have an advanced usecase and do not like how the caching works, you can implement your own caching manager by having it implement the `jikan.Cache` interface.
-```go
-package main
-
-import (
-    "github.com/minnasync/jikan-go"
-)
-
-type CustomCache struct {}
-
-func NewCustomCache() jikan.Cache {
-    return &CustomCache{}
-}
-
-func (c *CustomCache) Get(ctx context.Context, key string, v any) error {}
-func (c *CustomCache) Set(ctx context.Context, key string, v any, ttl time.Duration) error {}
-func (c *CustomCache) DeferSet(ctx context.Context, key string, v any, ttl time.Duration) {}
-func (c *CustomCache) BulkSet(ctx context.Context, keyValues map[string]any, ttl time.Duration) error {}
-func (c *CustomCache) DeferBulkSet(ctx context.Context, keyValues map[string]any, ttl time.Duration) {}
-func (c *CustomCache) Delete(ctx context.Context, key string) error {}
-
-func main() {
-    cache := NewCustomCache()
-    client = jikan.NewClient(jikan.WithCache(cache))
-}
-```

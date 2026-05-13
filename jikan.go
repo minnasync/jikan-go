@@ -19,7 +19,7 @@ type Client struct {
 	client  *http.Client
 	baseUrl *url.URL
 
-	cache Cache
+	cache Caches
 
 	common  service
 	Anime   *AnimeEndpoints
@@ -36,12 +36,12 @@ type ClientOption func(*Client)
 // WithRedisCache will enable redis caching.
 func WithRedisCache(client *redis.Client) ClientOption {
 	return func(c *Client) {
-		c.cache = NewRedisCache(client)
+		c.cache = NewRedisJSONCache(client)
 	}
 }
 
 // WithCache will enable caching with a custom cache manager.
-func WithCache(cache Cache) ClientOption {
+func WithCache(cache Caches) ClientOption {
 	return func(c *Client) {
 		c.cache = cache
 	}

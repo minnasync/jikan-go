@@ -2,6 +2,7 @@ package jikan
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/minnasync/jikan-go/internal/redisx"
@@ -9,91 +10,170 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-type Cache interface {
+type CacheOpts struct {
+	TTL *time.Duration
+}
+
+// baseCache is a simple inferface for implementing methods for advanced caching.
+type baseCache[T any] interface {
 	// Get will get a value from the cache.
-	Get(ctx context.Context, key string, value any) error
+	Get(ctx context.Context, key string) (*T, error)
 	// Set will set a value in the cache.
-	Set(ctx context.Context, key string, value any, ttl time.Duration) error
-	// DeferSet will set a value in the cache, but will not wait for the operation to complete.
-	DeferSet(ctx context.Context, key string, value any, ttl time.Duration)
+	Set(ctx context.Context, key string, value T, opts *CacheOpts) error
 	// BulkSet will set multiple values in the cache.
-	BulkSet(ctx context.Context, keyValues map[string]any, ttl time.Duration) error
-	// DeferBulkSet will set multiple values in the cache, but will not wait for the operation to complete.
-	DeferBulkSet(ctx context.Context, keyValues map[string]any, ttl time.Duration)
+	BulkSet(ctx context.Context, keyValues map[string]T, opts *CacheOpts) error
 	// Delete will delete a value from the cache.
 	Delete(ctx context.Context, key string) error
 }
 
-type RedisCache struct {
+type redisJSONCacheImpl[T any] struct {
 	sf     singleflight.Group
 	client *redis.Client
 }
 
 // NewRedisCache will create a new cache manager for Redis that implements the Cache interface.
-//
-// This will only use JSON commands, so your Redis server must have the JSON module loaded.
-func NewRedisCache(client *redis.Client) Cache {
-	return &RedisCache{
-		client: client,
-	}
+func newRedisJSONCache[T any](client *redis.Client) baseCache[T] {
+	return &redisJSONCacheImpl[T]{client: client}
 }
 
-func (c *RedisCache) Get(ctx context.Context, key string, v any) error {
-	_, err, _ := c.sf.Do(key, func() (any, error) {
+func (c *redisJSONCacheImpl[T]) Get(ctx context.Context, key string) (*T, error) {
+	result, err, _ := c.sf.Do(key, func() (any, error) {
+		var v T
 		if err := redisx.JSONUnwrap(ctx, c.client, key, "$", &v); err != nil {
 			return nil, err
 		}
 
-		return nil, nil
+		return v, nil
 	})
 
-	return err
+	if err != nil {
+		return nil, err
+	}
+
+	value, ok := result.(T)
+	if !ok {
+		return nil, nil
+	}
+
+	return &value, nil
 }
 
-func (c *RedisCache) Set(ctx context.Context, key string, v any, ttl time.Duration) error {
+func (c *redisJSONCacheImpl[T]) Set(ctx context.Context, key string, value T, opts *CacheOpts) error {
 	pipeline := c.client.Pipeline()
 
-	pipeline.JSONSet(ctx, key, "$", v)
-	pipeline.Expire(ctx, key, ttl)
+	pipeline.JSONSet(ctx, key, "$", value)
 
-	_, err := pipeline.Exec(ctx)
-	return err
-}
-
-func (c *RedisCache) DeferSet(ctx context.Context, key string, v any, ttl time.Duration) {
-	go func() {
-		_ = c.Set(ctx, key, v, ttl)
-	}()
-}
-
-func (c *RedisCache) BulkSet(ctx context.Context, keyValues map[string]any, ttl time.Duration) error {
-	pipeline := c.client.Pipeline()
-
-	for key, value := range keyValues {
-		pipeline.JSONSet(ctx, key, "$", value)
-		pipeline.Expire(ctx, key, ttl)
+	if opts != nil && opts.TTL != nil {
+		pipeline.Expire(ctx, key, *opts.TTL)
 	}
 
 	_, err := pipeline.Exec(ctx)
 	return err
 }
 
-func (c *RedisCache) DeferBulkSet(ctx context.Context, keyValues map[string]any, ttl time.Duration) {
-	go func() {
-		_ = c.BulkSet(ctx, keyValues, ttl)
-	}()
+func (c *redisJSONCacheImpl[T]) BulkSet(ctx context.Context, keyValues map[string]T, opts *CacheOpts) error {
+	pipeline := c.client.Pipeline()
+
+	for key, value := range keyValues {
+		pipeline.JSONSet(ctx, key, "$", value)
+
+		if opts != nil && opts.TTL != nil {
+			pipeline.Expire(ctx, key, *opts.TTL)
+		}
+	}
+
+	_, err := pipeline.Exec(ctx)
+	return err
 }
 
-func (c *RedisCache) Delete(ctx context.Context, key string) error {
-	_, err, _ := c.sf.Do(key, func() (any, error) {
-		cmd := c.client.JSONDel(ctx, key, "$")
+func (c *redisJSONCacheImpl[T]) Delete(ctx context.Context, key string) error {
+	return c.client.JSONDel(ctx, key, "$").Err()
+}
 
-		if err := cmd.Err(); err != nil {
-			return nil, err
-		}
+type AnimeCache interface {
+	AnimeCache() baseCache[Anime]
+	AnimeFullCache() baseCache[AnimeFull]
 
-		return nil, nil
-	})
+	GetAnime(ctx context.Context, id string) (*Anime, error)
+	GetAnimeFull(ctx context.Context, id string) (*AnimeFull, error)
+	SetAnime(ctx context.Context, data Anime) error
+	SetAnimeFull(ctx context.Context, data AnimeFull) error
+	BulkSetAnime(ctx context.Context, data []Anime) error
+}
 
-	return err
+type animeCacheImpl struct {
+	anime     baseCache[Anime]
+	animeFull baseCache[AnimeFull]
+}
+
+func newAnimeCache(anime baseCache[Anime], animeFull baseCache[AnimeFull]) AnimeCache {
+	return &animeCacheImpl{anime: anime, animeFull: animeFull}
+}
+
+func (c animeCacheImpl) AnimeCache() baseCache[Anime] {
+	return c.anime
+}
+
+func (c animeCacheImpl) AnimeFullCache() baseCache[AnimeFull] {
+	return c.animeFull
+}
+
+func (c animeCacheImpl) GetAnime(ctx context.Context, id string) (*Anime, error) {
+	return c.anime.Get(ctx, "jikan:anime_"+id)
+}
+
+func (c animeCacheImpl) GetAnimeFull(ctx context.Context, id string) (*AnimeFull, error) {
+	return c.animeFull.Get(ctx, "jikan:anime-full_"+id)
+}
+
+func (c animeCacheImpl) SetAnime(ctx context.Context, data Anime) error {
+	return c.anime.Set(ctx, "jikan:anime_"+strconv.Itoa(data.MalID), data, nil)
+}
+
+func (c animeCacheImpl) SetAnimeFull(ctx context.Context, data AnimeFull) error {
+	// If the full value is fetched, we can set the base as well.
+	// Makes sense to do since it's the same info.
+	if err := c.SetAnime(ctx, data.Anime); err != nil {
+		return err
+	}
+
+	return c.animeFull.Set(ctx, "jikan:anime-full_"+strconv.Itoa(data.MalID), data, nil)
+}
+
+func (c animeCacheImpl) BulkSetAnime(ctx context.Context, data []Anime) error {
+	entries := make(map[string]Anime, len(data))
+	for _, entry := range data {
+		entries["jikan:anime_"+strconv.Itoa(entry.MalID)] = entry
+	}
+
+	return c.anime.BulkSet(ctx, entries, nil)
+}
+
+type Caches interface {
+	Anime() AnimeCache
+}
+
+type RedisJSONCache struct {
+	anime AnimeCache
+}
+
+// RedisJSONCache is a cache manager for Redis.
+//
+// This will only use Redis' JSON commands, so using this will require your Redis
+// instance to have the JSON module loaded. This is available on the redis-stack
+// builds.
+//
+// When setting up your redis.conf, all you need to do is add this line:
+// `loadmodule /opt/redis-stack/lib/rejson.so`
+func NewRedisJSONCache(client *redis.Client) Caches {
+	return &RedisJSONCache{
+		anime: newAnimeCache(
+			newRedisJSONCache[Anime](client),
+			newRedisJSONCache[AnimeFull](client),
+		),
+	}
+}
+
+func (c *RedisJSONCache) Anime() AnimeCache {
+	return c.anime
 }
