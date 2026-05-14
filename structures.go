@@ -71,3 +71,8 @@ type Link struct {
 	Name string `json:"name"`
 	URL  string `json:"url"`
 }
+
+type Season struct {
+	Year    int      `json:"year"`
+	Seasons []string `json:"seasons"`
+}
