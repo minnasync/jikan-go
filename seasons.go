@@ -7,11 +7,11 @@ import (
 
 type SeasonsEndpoints service
 
-// Now will return the list of anime airing in the current season
+// GetNow will return the list of anime airing in the current season
 // To filter results, pass in query parameters. Refer to documentation for accepted parameters.
 //
 // https://docs.api.jikan.moe/#/seasons/getseasonnow
-func (s *SeasonsEndpoints) Now(ctx context.Context, query *url.Values) (*PaginatedResponseBody[Anime], *Response, error) {
+func (s *SeasonsEndpoints) GetNow(ctx context.Context, query *url.Values) (*PaginatedResponseBody[Anime], *Response, error) {
 	info := new(PaginatedResponseBody[Anime])
 
 	path := "/v4/seasons/now"
