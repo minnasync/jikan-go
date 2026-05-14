@@ -2,6 +2,7 @@ package jikan
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"strings"
 )
@@ -179,6 +180,95 @@ func (s *AnimeEndpoints) GetById(ctx context.Context, id string) (*Anime, *Respo
 		IsCached: false,
 		Response: resp,
 	}, nil
+}
+
+type Episode struct {
+	MalID         int      `json:"mal_id"`
+	URL           *string  `json:"url"`
+	Title         string   `json:"title"`
+	TitleJapanese *string  `json:"title_japanese"`
+	TitleRomanji  *string  `json:"title_romanji"`
+	Aired         *string  `json:"aired"`
+	Score         *float32 `json:"score"`
+	Filler        bool     `json:"filler"`
+	Recap         bool     `json:"recap"`
+	ForumURL      *string  `json:"forum_url"`
+}
+
+// GetEpisodes will return a list of episodes for an anime.
+//
+// https://docs.api.jikan.moe/#/anime/getanimeepisodes
+func (s *AnimeEndpoints) GetEpisodes(ctx context.Context, id string, query *url.Values) (*PaginatedResponseBody[Episode], *Response, error) {
+	episodes := new(PaginatedResponseBody[Episode])
+
+	path := fmt.Sprintf("/v4/anime/%s/episodes", id)
+	path += "?" + query.Encode()
+
+	req, err := s.client.NewGETRequest(path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resp, err := s.client.Do(ctx, req, episodes)
+	if err != nil {
+		return nil, &Response{
+			IsCached: false,
+			Response: resp,
+		}, err
+	}
+
+	if s.client.cache != nil {
+		go func() {
+			_ = s.client.cache.Anime().BulkSetEpisodes(ctx, id, episodes.Data)
+		}()
+	}
+
+	return episodes, &Response{
+		IsCached: false,
+		Response: resp,
+	}, nil
+}
+
+// GetEpisodeById will return the details for a specific episodes based on its id.
+//
+// https://docs.api.jikan.moe/#/anime/getanimeepisodebyid
+func (s *AnimeEndpoints) GetEpisodeById(ctx context.Context, id string, ep int) (*Episode, *Response, error) {
+	path := fmt.Sprintf("/v4/anime/%s/episodes/%d", id, ep)
+
+	if s.client.cache != nil {
+		episode, err := s.client.cache.Anime().GetEpisode(ctx, id, ep)
+		if err == nil {
+			return episode, &Response{
+				IsCached: true,
+				Response: nil,
+			}, nil
+		}
+	}
+
+	req, err := s.client.NewGETRequest(path)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	episode := new(ResponseBody[Episode])
+	resp, err := s.client.Do(ctx, req, episode)
+	if err != nil {
+		return nil, &Response{
+			IsCached: false,
+			Response: resp,
+		}, err
+	}
+
+	if s.client.cache != nil {
+		go func() {
+			_ = s.client.cache.Anime().SetEpisode(ctx, id, episode.Data)
+		}()
+	}
+
+	return &episode.Data, &Response{
+		IsCached: false,
+		Response: resp,
+	}, err
 }
 
 // GetSearch will search for an anime based on a query.

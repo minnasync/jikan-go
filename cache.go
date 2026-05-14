@@ -3,6 +3,7 @@ package jikan
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strconv"
 	"sync"
 	"time"
@@ -35,21 +36,27 @@ type baseCache[T any] interface {
 type AnimeCache interface {
 	AnimeCache() baseCache[Anime]
 	AnimeFullCache() baseCache[AnimeFull]
+	EpisodeCache() baseCache[Episode]
 
 	GetAnime(ctx context.Context, id string) (*Anime, error)
 	GetAnimeFull(ctx context.Context, id string) (*AnimeFull, error)
 	SetAnime(ctx context.Context, data Anime) error
 	SetAnimeFull(ctx context.Context, data AnimeFull) error
 	BulkSetAnime(ctx context.Context, data []Anime) error
+
+	GetEpisode(ctx context.Context, id string, ep int) (*Episode, error)
+	SetEpisode(ctx context.Context, id string, data Episode) error
+	BulkSetEpisodes(ctx context.Context, id string, data []Episode) error
 }
 
 type animeCacheImpl struct {
 	anime     baseCache[Anime]
 	animeFull baseCache[AnimeFull]
+	episodes  baseCache[Episode]
 }
 
-func newAnimeCache(anime baseCache[Anime], animeFull baseCache[AnimeFull]) AnimeCache {
-	return &animeCacheImpl{anime: anime, animeFull: animeFull}
+func newAnimeCache(anime baseCache[Anime], animeFull baseCache[AnimeFull], episodes baseCache[Episode]) AnimeCache {
+	return &animeCacheImpl{anime: anime, animeFull: animeFull, episodes: episodes}
 }
 
 func (c animeCacheImpl) AnimeCache() baseCache[Anime] {
@@ -58,6 +65,10 @@ func (c animeCacheImpl) AnimeCache() baseCache[Anime] {
 
 func (c animeCacheImpl) AnimeFullCache() baseCache[AnimeFull] {
 	return c.animeFull
+}
+
+func (c animeCacheImpl) EpisodeCache() baseCache[Episode] {
+	return c.episodes
 }
 
 func (c animeCacheImpl) GetAnime(ctx context.Context, id string) (*Anime, error) {
@@ -93,6 +104,25 @@ func (c animeCacheImpl) BulkSetAnime(ctx context.Context, data []Anime) error {
 	}
 
 	return c.anime.BulkSet(ctx, entries, nil)
+}
+
+func (c animeCacheImpl) GetEpisode(ctx context.Context, id string, ep int) (*Episode, error) {
+	return c.episodes.Get(ctx, fmt.Sprintf("jikan:anime:%s:episode:%d", id, ep))
+}
+
+func (c *animeCacheImpl) SetEpisode(ctx context.Context, id string, data Episode) error {
+	return c.episodes.Set(ctx, fmt.Sprintf("jikan:anime:%s:episode:%d", id, data.MalID), data, &CacheOpts{
+		TTL: new(time.Hour * 24),
+	})
+}
+
+func (c *animeCacheImpl) BulkSetEpisodes(ctx context.Context, id string, data []Episode) error {
+	entries := make(map[string]Episode, len(data))
+	for _, entry := range data {
+		entries[fmt.Sprintf("jikan:anime:%s:episode:%d", id, entry.MalID)] = entry
+	}
+
+	return c.episodes.BulkSet(ctx, entries, nil)
 }
 
 type inMemoryCacheEntry[T any] struct {
@@ -184,6 +214,7 @@ func NewCache() Caches {
 		anime: newAnimeCache(
 			newInMemoryCache[Anime](),
 			newInMemoryCache[AnimeFull](),
+			newInMemoryCache[Episode](),
 		),
 	}
 }
@@ -277,6 +308,7 @@ func NewRedisJSONCache(client *redis.Client) Caches {
 		anime: newAnimeCache(
 			newRedisJSONCache[Anime](client),
 			newRedisJSONCache[AnimeFull](client),
+			newRedisJSONCache[Episode](client),
 		),
 	}
 }
