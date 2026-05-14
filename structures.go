@@ -11,14 +11,15 @@ type PaginationItems struct {
 }
 
 type Pagination struct {
-	LastVisiblePage int             `json:"last_visible_page"`
-	HasNextPage     bool            `json:"has_next_page"`
-	CurrentPage     int             `json:"current_page"`
-	Items           PaginationItems `json:"items"`
+	LastVisiblePage int              `json:"last_visible_page"`
+	HasNextPage     bool             `json:"has_next_page"`
+	CurrentPage     *int             `json:"current_page,omitempty"`
+	Items           *PaginationItems `json:"items,omitempty"`
 }
 
 type PaginatedResponseBody[T any] struct {
 	Data []T `json:"data"`
+	Pagination
 }
 
 type Image struct {
