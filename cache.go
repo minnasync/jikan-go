@@ -72,15 +72,15 @@ func (c animeCacheImpl) EpisodeCache() baseCache[Episode] {
 }
 
 func (c animeCacheImpl) GetAnime(ctx context.Context, id string) (*Anime, error) {
-	return c.anime.Get(ctx, "jikan:anime_"+id)
+	return c.anime.Get(ctx, "jikan:anime:"+id)
 }
 
 func (c animeCacheImpl) GetAnimeFull(ctx context.Context, id string) (*AnimeFull, error) {
-	return c.animeFull.Get(ctx, "jikan:anime-full_"+id)
+	return c.animeFull.Get(ctx, "jikan:anime-full:"+id)
 }
 
 func (c animeCacheImpl) SetAnime(ctx context.Context, data Anime) error {
-	return c.anime.Set(ctx, "jikan:anime_"+strconv.Itoa(data.MalID), data, &CacheOpts{
+	return c.anime.Set(ctx, "jikan:anime:"+strconv.Itoa(data.MalID), data, &CacheOpts{
 		TTL: new(time.Hour * 24),
 	})
 }
@@ -92,7 +92,7 @@ func (c animeCacheImpl) SetAnimeFull(ctx context.Context, data AnimeFull) error 
 		return err
 	}
 
-	return c.animeFull.Set(ctx, "jikan:anime-full_"+strconv.Itoa(data.MalID), data, &CacheOpts{
+	return c.animeFull.Set(ctx, "jikan:anime-full:"+strconv.Itoa(data.MalID), data, &CacheOpts{
 		TTL: new(time.Hour * 24),
 	})
 }
@@ -100,7 +100,7 @@ func (c animeCacheImpl) SetAnimeFull(ctx context.Context, data AnimeFull) error 
 func (c animeCacheImpl) BulkSetAnime(ctx context.Context, data []Anime) error {
 	entries := make(map[string]Anime, len(data))
 	for _, entry := range data {
-		entries["jikan:anime_"+strconv.Itoa(entry.MalID)] = entry
+		entries["jikan:anime:"+strconv.Itoa(entry.MalID)] = entry
 	}
 
 	return c.anime.BulkSet(ctx, entries, nil)
